@@ -62,7 +62,7 @@ class PointsCalculator:
         df["historic_ppg"] = df["avg_ppg_past2"].round(1)
 
         # Use the fixture difficulty from fetch_player_fixture_difficulty
-        df["fixture_diff"] = (6 - df["diff"]).round(1)
+        df["fixture_diff"] = (df["diff"]).round(1)
 
         # Reliability as percentage (starts/games)
         df["reliability"] = (
