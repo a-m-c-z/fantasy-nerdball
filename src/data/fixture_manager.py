@@ -5,6 +5,101 @@ import os
 import pandas as pd
 from ..api.fpl_client import FPLClient
 
+class EnhancedFixtureDifficultyCalculator:
+    """
+    Enhanced fixture difficulty calculator that combines:
+    1. FPL official difficulty ratings (baseline)
+    2. Team attacking ratings (actual goal-scoring performance)
+    3. Team defensive ratings (actual defensive performance)
+    4. Position-specific adjustments
+    """
+    
+    def __init__(self, config):
+        self.config = config
+        self.team_ratings = {}
+        self.load_team_ratings()
+    
+    def load_team_ratings(self):
+        """Load team ratings from CSV file."""
+        ratings_file = 'data/team_ratings.csv'
+        
+        if not os.path.exists(ratings_file):
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Note: {ratings_file} not found. Using FPL difficulty only.")
+            # Use neutral ratings as fallback
+            for team in self.config.TEAM_MODIFIERS.keys():
+                self.team_ratings[team] = {
+                    'attacking_rating': 1.0,
+                    'defensive_rating': 1.0
+                }
+            return
+        
+        try:
+            ratings_df = pd.read_csv(ratings_file, index_col='team')
+            self.team_ratings = ratings_df[['attacking_rating', 'defensive_rating']].to_dict('index')
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Enhanced fixture ratings loaded for {len(self.team_ratings)} teams")
+        except Exception as e:
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Error loading team ratings: {e}")
+                print("Using FPL difficulty only.")
+            for team in self.config.TEAM_MODIFIERS.keys():
+                self.team_ratings[team] = {
+                    'attacking_rating': 1.0,
+                    'defensive_rating': 1.0
+                }
+    
+    def get_attacking_rating(self, team_name):
+        """Get attacking rating for a team."""
+        if team_name in self.team_ratings:
+            return self.team_ratings[team_name]['attacking_rating']
+        return 1.0
+    
+    def get_defensive_rating(self, team_name):
+        """Get defensive rating for a team."""
+        if team_name in self.team_ratings:
+            return self.team_ratings[team_name]['defensive_rating']
+        return 1.0
+    
+    def calculate_enhanced_difficulty(self, opponent_name, player_position, 
+                                     fpl_difficulty, is_home=True):
+        """
+        Calculate enhanced fixture difficulty for a player against an opponent.
+        
+        Args:
+            opponent_name (str): Name of the opponent team
+            player_position (str): Player's position (GK, DEF, MID, FWD)
+            fpl_difficulty (int): FPL's official difficulty rating (1-5)
+            is_home (bool): Whether playing at home
+            
+        Returns:
+            float: Enhanced difficulty rating (1.0 = easiest, 5.0 = hardest)
+        """
+        base_difficulty = float(fpl_difficulty)
+        opponent_attack = self.get_attacking_rating(opponent_name)
+        opponent_defence = self.get_defensive_rating(opponent_name)
+        
+        # Position-specific adjustments
+        if player_position == 'GK':
+            difficulty_adjustment = (opponent_attack - 1.0) * 1.5
+        elif player_position == 'DEF':
+            difficulty_adjustment = (opponent_attack - 1.0) * 1.5
+        elif player_position == 'FWD':
+            difficulty_adjustment = (opponent_defence - 1.0) * 1.5
+        elif player_position == 'MID':
+            attack_component = (opponent_attack - 1.0) * 0.6
+            defence_component = (opponent_defence - 1.0) * 0.9
+            difficulty_adjustment = attack_component + defence_component
+        else:
+            difficulty_adjustment = 0.0
+        
+        # Home advantage
+        if is_home:
+            difficulty_adjustment -= 0.3
+        
+        enhanced_difficulty = base_difficulty + difficulty_adjustment
+        return max(1.0, min(5.0, enhanced_difficulty))
+
 
 class FixtureManager:
     """Handles fixture data and difficulty calculations."""
@@ -12,6 +107,7 @@ class FixtureManager:
     def __init__(self, config):
         self.config = config
         self.fpl_client = FPLClient()
+        self.enhanced_calculator = EnhancedFixtureDifficultyCalculator(config)
     
     def _calculate_decay_weights(self, num_gameweeks: int) -> list:
         """
@@ -181,23 +277,38 @@ class FixtureManager:
             gw_fixtures = fixtures[fixtures["event"] == current_gw]
             
             for _, fixture_row in gw_fixtures.iterrows():
-                for home_away, team_col, diff_col in [
-                    ("home", "team_h", "team_h_difficulty"),
-                    ("away", "team_a", "team_a_difficulty"),
-                ]:
-                    team_id = fixture_row[team_col]
-                    diff = fixture_row[diff_col]
-                    
-                    # Get players for this team
-                    team_players = players[players["team_id"] == team_id]
-                    for _, player_row in team_players.iterrows():
-                        player_diffs.append({
-                            "name_key": player_row["name_key"],
-                            "team_id": team_id,
-                            "gameweek": current_gw,
-                            "diff": diff,
-                            "weight": weight
-                        })
+                    for home_away, team_col, diff_col, opponent_col in [
+                        ("home", "team_h", "team_h_difficulty", "team_a"),
+                        ("away", "team_a", "team_a_difficulty", "team_h"),
+                    ]:
+                        team_id = fixture_row[team_col]
+                        opponent_id = fixture_row[opponent_col]
+                        fpl_diff = fixture_row[diff_col]
+                        is_home = (home_away == "home")
+                        
+                        # Get opponent name from teams_df
+                        opponent_name = (
+                            teams_df[teams_df["id"]
+                                     == opponent_id]["name"].iloc[0]
+                                     )
+                        
+                        # Get players for this team
+                        team_players = players[players["team_id"] == team_id]
+                        for _, player_row in team_players.iterrows():
+                            player_position = player_row["position"]
+                            
+                            # Calculate enhanced difficulty for this player
+                            enhanced_diff = self.enhanced_calculator.calculate_enhanced_difficulty(
+                                opponent_name, player_position, fpl_diff, is_home
+                            )
+                            
+                            player_diffs.append({
+                                "name_key": player_row["name_key"],
+                                "team_id": team_id,
+                                "gameweek": current_gw,
+                                "diff": enhanced_diff,
+                                "weight": weight
+                            })
 
         if not player_diffs:
             print(f"Warning: No fixtures found for gameweeks "
