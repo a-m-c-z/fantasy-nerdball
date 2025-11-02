@@ -1,4 +1,5 @@
-"""Module for managing historical player performance data with xG analysis."""
+"""Module for managing historical player performance data with xG analysis
+"""
 
 import pandas as pd
 import numpy as np
@@ -74,7 +75,8 @@ class HistoricalDataManager:
         df["total_points"] = pd.to_numeric(
             df["total_points"], errors="coerce"
         ).fillna(0)
-        df["games_played"] = (df["minutes_played"] / 90).round().clip(lower=0)
+        df["games_played"] = (df["minutes_played"] / 90).round().clip(
+            lower=0)
         df["season_reliability"] = (df["games_played"] / 30).clip(upper=1.0)
         
         return df
@@ -100,8 +102,8 @@ class HistoricalDataManager:
             else:
                 df[col_name] = 0.0
                 if self.config.GRANULAR_OUTPUT:
-                    print(f"Warning: {df_col} not found in {season_folder}, "
-                          "using 0")
+                    print(f"Warning: {df_col} not found in {season_folder}"
+                          f", using 0")
         
         return df
     
@@ -167,16 +169,16 @@ class HistoricalDataManager:
             self, df: pd.DataFrame) -> pd.DataFrame:
         """Calculate position-weighted xG performance ratios."""
         # Initialise xG performance columns
-        df["historical_xOP"] = 1.0  # Historical Expected Overperformance ratio
-        df["attacking_xOP_hist"] = 1.0  # Separate components for debugging
+        df["historical_xOP"] = 1.0
+        df["attacking_xOP_hist"] = 1.0
         df["defensive_xOP_hist"] = 1.0
         
         # Calculate attacking component for relevant positions
         attacking_hist_mask = (
             (df["xgi_per_game"] >
              self.historical_thresholds['min_xgi_per_game']) & 
-            (df["games_played"] >= self.historical_thresholds['min_games']) & 
-            df["element_type"].isin([2, 3, 4])  # DEF, MID, FWD 
+            (df["games_played"] >= self.historical_thresholds['min_games'])
+            & df["element_type"].isin([2, 3, 4])  # DEF, MID, FWD 
         )
         
         if attacking_hist_mask.any():
@@ -189,13 +191,12 @@ class HistoricalDataManager:
         defensive_hist_mask = (
             (df["xgc_per_game"] >
              self.historical_thresholds['min_xgc_per_game']) & 
-            (df["games_played"] >= self.historical_thresholds['min_games']) & 
-            df["element_type"].isin([1, 2, 3])  # GK, DEF, MID
+            (df["games_played"] >= self.historical_thresholds['min_games'])
+            & df["element_type"].isin([1, 2, 3])  # GK, DEF, MID
         )
         
         if defensive_hist_mask.any():
-            # For GC, higher ratio = 
-            # better performance (conceding less than expected)
+            # For GC, higher ratio = better (conceding less than expected)
             df.loc[defensive_hist_mask, "defensive_xOP_hist"] = (
                 df.loc[defensive_hist_mask,"xgc_per_game"] / 
                 df.loc[defensive_hist_mask, "goals_conceded_per_game"].clip(
@@ -233,7 +234,8 @@ class HistoricalDataManager:
             attacking_weight > 0 and 
             row["xgi_per_game"] >
             self.historical_thresholds['min_xgi_per_game'] 
-            and row["games_played"] >= self.historical_thresholds['min_games']
+            and row["games_played"] >=
+            self.historical_thresholds['min_games']
         )
         
         has_defensive_data = (
@@ -307,14 +309,15 @@ class HistoricalDataManager:
         result_df = result_df.rename(columns=rename_map)
         return result_df
     
-    def calculate_xg_performance_modifier(self, player_data: dict) -> float:
+    def calculate_xg_performance_modifier(self,
+                                        player_data: dict) -> float:
         """
-        Enhanced xG performance modifier that properly handles regression 
-        and volatility.
+        ENHANCED xG performance modifier with MUCH STRONGER penalties for
+        defensive overperformance and proper regression logic.
         
         Args:
-            player_data (dict): Player's historical and current xG performance 
-            data
+            player_data (dict): Player's historical and current xG
+                               performance data
             
         Returns:
             float: Performance modifier (1.0 = neutral, >1.0 = expected 
@@ -323,7 +326,8 @@ class HistoricalDataManager:
         position = player_data.get('current_position', 'MID')
         
         # Get historical xG performance ratios across seasons
-        historical_baseline = self._calculate_historical_baseline(player_data)
+        historical_baseline = self._calculate_historical_baseline(
+            player_data)
         
         # Get current season performance
         current_xop = player_data.get('current_xOP', 1.0)
@@ -342,7 +346,8 @@ class HistoricalDataManager:
         if historical_baseline is not None:
             # Player has historical data - compare current to historical
             modifier, volatility = self._calculate_regression_modifier(
-                historical_baseline, current_xop, season_progression, position
+                historical_baseline, current_xop, season_progression,
+                position
             )
         else:
             # New player - evaluate current performance with high volatility
@@ -350,13 +355,17 @@ class HistoricalDataManager:
                 current_xop, season_progression, current_xg_context
             )
         
-        # Apply conservative volatility penalty
+        # Apply STRONGER volatility penalty
         volatility_penalty = self._calculate_volatility_penalty(volatility)
-        final_modifier = 1.0 + (modifier - 1.0) * (1.0 - volatility_penalty)
+        final_modifier = 1.0 + (modifier - 1.0) * (
+            1.0 - volatility_penalty)
 
-        return max(0.6, min(1.5, final_modifier))  # Reasonable bounds
+        # Allow wider bounds now that dilution is removed
+        # 0.4 = very strong penalty, 1.6 = very strong bonus
+        return max(0.4, min(1.6, final_modifier))
     
-    def _calculate_historical_baseline(self, player_data: dict) -> float:
+    def _calculate_historical_baseline(self,
+                                      player_data: dict) -> float:
         """Calculate weighted historical baseline from available seasons."""
         historical_xop_values = []
         weights = []
@@ -380,29 +389,31 @@ class HistoricalDataManager:
     def _calculate_season_progression_factor(
             self, gameweeks_completed: int) -> float:
         """
-        Calculate how reliable current season stats are based on games played.
+        Calculate how reliable current season stats are based on games.
         
         Returns:
-            float: 0.0 = very early season (high volatility), 
-                  1.0 = late season (reliable)
+            float: 0.0 = very early (high volatility), 1.0 = late (reliable)
         """
         if gameweeks_completed <= 3:
-            return 0.1  # Very early season - current stats highly volatile
+            return 0.1
         elif gameweeks_completed <= 6:
-            return 0.3  # Early season - still quite volatile
+            return 0.3
         elif gameweeks_completed <= 10:
-            return 0.6  # Mid-early season - becoming more reliable
+            return 0.6
         elif gameweeks_completed <= 15:
-            return 0.8  # Mid season - quite reliable
+            return 0.8
         else:
-            return 1.0  # Late season - very reliable
+            return 1.0
 
     def _calculate_regression_modifier(self, historical_baseline: float, 
                                      current_xop: float, 
                                      season_progression: float, 
                                      position: str) -> tuple:
         """
-        Calculate regression-based modifier for players with historical data.
+        Calculate regression-based modifier with MUCH STRONGER penalties.
+        
+        Key principle: Extreme deviations from historical baseline are 
+        almost always unsustainable and require strong regression.
         
         Returns:
             tuple: (modifier, volatility_score)
@@ -410,41 +421,75 @@ class HistoricalDataManager:
         deviation = current_xop - historical_baseline
         abs_deviation = abs(deviation)
         
-        # Position-based sensitivity to xG regression
+        # Position-based sensitivity
         position_sensitivity = {
-            'FWD': 1.0,   # Forwards most sensitive to xG regression
-            'MID': 0.7,   # Midfielders moderately sensitive
-            'DEF': 0.8,   # Defenders quite sensitive (clean sheets)
-            'GK': 0.9     # Goalkeepers very sensitive (save performance)
+            'FWD': 1.0,   # Forwards moderately sensitive
+            'MID': 0.9,   # Midfielders slightly less sensitive
+            'DEF': 1.2,   # Defenders very sensitive (clean sheets fragile)
+            'GK': 1.3     # Goalkeepers extremely sensitive
         }
         
-        sensitivity = position_sensitivity.get(position, 0.7)
+        sensitivity = position_sensitivity.get(position, 0.9)
         
-        if deviation > 0:  # Currently overperforming historical baseline
+        # Defensive positions have fragile overperformance
+        is_defensive_position = position in ['DEF', 'GK']
+        
+        if deviation > 0:  # Overperforming historical baseline
             if season_progression < 0.6:
-                # Early season overperformance - expect significant regression
-                regression_strength = abs_deviation * sensitivity * 0.15
-                modifier = 1.0 - regression_strength
-                volatility = abs_deviation * (1.0 - season_progression) * 0.3
-            else:
-                # Late season overperformance - might be genuine improvement
-                regression_strength = abs_deviation * sensitivity * 0.08
-                modifier = 1.0 - regression_strength
-                volatility = abs_deviation * 0.1
+                # Early season overperformance - VERY STRONG regression
+                if is_defensive_position:
+                    # Defensive overperformance is highly fragile
+                    # Example: Gabriel 0.96→1.91 (+0.95 deviation)
+                    # Should get: 1.0 - (0.95 * 1.2 * 0.75) = 0.145
+                    regression_strength = min(
+                        abs_deviation * sensitivity * 0.75, 0.8
+                    )
+                else:
+                    # Attacking overperformance less fragile but still
+                    # unlikely to sustain
+                    # Example: Semenyo 1.22→2.02 (+0.80 deviation)
+                    # Should get: 1.0 - (0.80 * 1.0 * 0.65) = 0.48
+                    regression_strength = min(
+                        abs_deviation * sensitivity * 0.65, 0.7
+                    )
                 
-        else:  # Currently underperforming historical baseline  
+                modifier = 1.0 - regression_strength
+                volatility = abs_deviation * (1.0 - season_progression) * 0.4
+            else:
+                # Late season - still strong regression needed
+                if is_defensive_position:
+                    regression_strength = min(
+                        abs_deviation * sensitivity * 0.55, 0.6
+                    )
+                else:
+                    # Might be genuine skill for attackers in late season
+                    regression_strength = min(
+                        abs_deviation * sensitivity * 0.35, 0.45
+                    )
+                
+                modifier = 1.0 - regression_strength
+                volatility = abs_deviation * 0.2
+                
+        else:  # Underperforming historical baseline
+            # Positive regression toward mean (expect improvement)
+            # Example: Mateta 1.18→0.70 (-0.48 deviation)
+            # Should get: 1.0 + (0.48 * 1.0 * 0.55) = 1.264
             if season_progression < 0.6:
-                # Early season underperformance - expect positive regression
-                regression_strength = abs_deviation * sensitivity * 0.12
+                # Early season - moderate positive regression
+                regression_strength = min(
+                    abs_deviation * sensitivity * 0.55, 0.4
+                )
                 modifier = 1.0 + regression_strength
                 volatility = abs_deviation * (1.0 - season_progression) * 0.25
             else:
-                # Late season underperformance - concerning, might be decline
-                regression_strength = abs_deviation * sensitivity * 0.05
+                # Late season - player might genuinely be declining
+                regression_strength = min(
+                    abs_deviation * sensitivity * 0.35, 0.3
+                )
                 modifier = 1.0 + regression_strength
                 volatility = abs_deviation * 0.15
         
-        return modifier, min(volatility, 0.4)  # Cap volatility at 40%
+        return modifier, min(volatility, 0.5)  # Cap volatility
 
     def _calculate_new_player_modifier(self, current_xop: float, 
                                      season_progression: float, 
@@ -456,13 +501,12 @@ class HistoricalDataManager:
             tuple: (modifier, volatility_score)
         """
         if current_xg_context == 'insufficient_data':
-            return 1.0, 0.2  # Neutral with moderate volatility
+            return 1.0, 0.2
         
         deviation_from_neutral = current_xop - 1.0
         
         if season_progression < 0.6:
-            # Early season: high volatility,
-            # limited trust in current performance
+            # Early season: high volatility
             if current_xop > 1.3:  # Very high performance
                 modifier = 1.0 + (deviation_from_neutral * 0.1)
                 volatility = 0.35
@@ -473,7 +517,7 @@ class HistoricalDataManager:
                 modifier = 1.0 + (deviation_from_neutral * 0.15)
                 volatility = 0.2
         else:
-            # Late season: current performance more reliable for new players
+            # Late season: current performance more reliable
             if current_xop > 1.2:  # High performance
                 modifier = 1.0 + (deviation_from_neutral * 0.2)
                 volatility = 0.15
@@ -488,25 +532,27 @@ class HistoricalDataManager:
 
     def _calculate_volatility_penalty(self, volatility: float) -> float:
         """
-        Conservative volatility penalty - punish uncertainty heavily.
+        Apply volatility penalty to reduce modifier toward neutral.
+        Higher volatility = less confident in current vs historical deviation.
         
         Args:
-            volatility (float): Volatility score (0.0 to 0.4)
+            volatility (float): Volatility score (0.0 to 0.5)
             
         Returns:
-            float: Penalty factor (0.0 to 0.35) to reduce modifier
+            float: Penalty factor (0.0 to 0.6) to reduce modifier
         """
-        # More aggressive scaling: 0.4 volatility = 35% penalty
-        base_penalty = volatility * 0.875  # Linear scaling
+        # Strong linear scaling
+        base_penalty = volatility * 1.2
         
-        # Add exponential component for very high volatility
+        # Add exponential component for high volatility
         if volatility > 0.25:
-            exponential_bonus = (volatility - 0.25) * 2.0
+            exponential_bonus = (volatility - 0.25) ** 1.5 * 0.8
             base_penalty += exponential_bonus
         
-        return min(base_penalty, 0.35)  # Cap at 35% penalty
+        return min(base_penalty, 0.6)  # Cap at 60% penalty
     
-    def calculate_data_availability_factor(self, player_data: dict) -> float:
+    def calculate_data_availability_factor(self,
+                                          player_data: dict) -> float:
         """
         Calculate factor to avoid over-penalising players with limited 
         historical data.
@@ -538,7 +584,8 @@ class HistoricalDataManager:
             games_factor = min(total_games / 60, 1.0)  # Cap at 60 games
             return 0.7 + (0.3 * games_factor)
     
-    def _get_current_season_data(self, current_players: pd.DataFrame) -> dict:
+    def _get_current_season_data(self,
+                                current_players: pd.DataFrame) -> dict:
         """
         Extract current season data in historical format after GW8.
         
@@ -581,13 +628,15 @@ class HistoricalDataManager:
                 # Calculate xOP if sufficient data
                 historical_xop = 1.0
                 if xgi_per_game > 0.1:
-                    historical_xop = goal_involvements_per_game / xgi_per_game
+                    historical_xop = (goal_involvements_per_game /
+                                    xgi_per_game)
                     historical_xop = max(0.2, min(3.0, historical_xop))
                 
                 current_season_data[name_key] = {
                     f"ppg_{current_season}": points_per_game,
                     f"games_{current_season}": games_played,
-                    f"reliability_{current_season}": min(1.0, games_played / gameweeks_completed),
+                    f"reliability_{current_season}": min(
+                        1.0, games_played / gameweeks_completed),
                     f"historical_xOP_{current_season}": historical_xop,
                     f"position_{current_season}": player.get("pos_id", 3)
                 }
@@ -597,7 +646,7 @@ class HistoricalDataManager:
     def merge_past_seasons(self, current: pd.DataFrame) -> pd.DataFrame:
         """
         Enhanced merge with proper NA handling for missing historical data,
-        conservative volatility penalties, and current season integration 
+        STRONGER volatility penalties, and current season integration 
         after GW8.
 
         Args:
@@ -609,7 +658,8 @@ class HistoricalDataManager:
         """
         # Fetch historical data
         hist_frames = [
-            self.fetch_past_season_points(s) for s in self.config.PAST_SEASONS
+            self.fetch_past_season_points(s)
+            for s in self.config.PAST_SEASONS
         ]
         
         # Merge historical data
@@ -619,12 +669,13 @@ class HistoricalDataManager:
         gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
         if gameweeks_completed >= 8:
             current_season_data = self._get_current_season_data(current)
-            hist = self._integrate_current_season_data(hist, current_season_data)
+            hist = self._integrate_current_season_data(hist,
+                                                      current_season_data)
         
-        # Calculate weighted averages (now includes current season if applicable)
+        # Calculate weighted averages (includes current season if applicable)
         hist = self._calculate_weighted_historical_averages(hist)
         
-        # Calculate xG performance modifiers
+        # Calculate xG performance modifiers with STRONGER penalties
         hist = self._calculate_xg_consistency_modifiers(hist)
         
         # Calculate current season reliability
@@ -633,12 +684,13 @@ class HistoricalDataManager:
         
         if self.config.GRANULAR_OUTPUT:
             if gameweeks_completed >= 8:
-                print("Current season data integrated into historical analysis "
-                      f"after {gameweeks_completed} completed gameweeks")
+                print("Current season data integrated into historical "
+                      f"analysis after {gameweeks_completed} completed "
+                      "gameweeks")
             print("Calculated reliability based on starts over "
                   f"{gameweeks_completed} completed gameweek(s)")
-            print("Applied consistent per-game weighted xG analysis with "
-                  f"conservative volatility penalties across "
+            print("Applied ENHANCED xG regression with stronger penalties "
+                  f"for defensive overperformance across "
                   f"{len(self.config.PAST_SEASONS)} seasons")
 
         # Enhanced merge columns including historical baseline tracking
@@ -650,7 +702,8 @@ class HistoricalDataManager:
         return current.merge(hist[merge_cols], on="name_key", how="left")
     
     def _integrate_current_season_data(self, hist: pd.DataFrame, 
-                                     current_season_data: dict) -> pd.DataFrame:
+                                     current_season_data: dict
+                                     ) -> pd.DataFrame:
         """
         Integrate current season data into historical dataframe after GW8.
         
@@ -712,16 +765,20 @@ class HistoricalDataManager:
         # Get relevant columns for calculations (including current season)
         ppg_cols = [c for c in hist.columns if c.startswith("ppg_")]
         games_cols = [c for c in hist.columns if c.startswith("games_")]
-        reliability_cols = [c for c in hist.columns if c.startswith("reliability_")]
-        historical_xop_cols = [c for c in hist.columns if c.startswith("historical_xOP_")]
+        reliability_cols = [c for c in hist.columns
+                          if c.startswith("reliability_")]
+        historical_xop_cols = [c for c in hist.columns
+                              if c.startswith("historical_xOP_")]
 
         # Determine weights (adjust if current season is included)
         gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
         if gameweeks_completed >= 8 and "ppg_2024-25" in ppg_cols:
             # Include current season with proportional weight
             current_season_weight = min(0.6, gameweeks_completed / 38)
-            historical_weights = [w * (1 - current_season_weight) 
-                                for w in self.config.HISTORIC_SEASON_WEIGHTS]
+            historical_weights = [
+                w * (1 - current_season_weight)
+                for w in self.config.HISTORIC_SEASON_WEIGHTS
+            ]
             all_weights = [current_season_weight] + historical_weights
             
             # Reorder columns to put current season first
@@ -729,10 +786,14 @@ class HistoricalDataManager:
                       [c for c in ppg_cols if "2024-25" not in c]
             games_cols = [c for c in games_cols if "2024-25" in c] + \
                         [c for c in games_cols if "2024-25" not in c]
-            reliability_cols = [c for c in reliability_cols if "2024-25" in c] + \
-                              [c for c in reliability_cols if "2024-25" not in c]
-            historical_xop_cols = [c for c in historical_xop_cols if "2024-25" in c] + \
-                                 [c for c in historical_xop_cols if "2024-25" not in c]
+            reliability_cols = [c for c in reliability_cols
+                              if "2024-25" in c] + \
+                              [c for c in reliability_cols
+                              if "2024-25" not in c]
+            historical_xop_cols = [c for c in historical_xop_cols
+                                 if "2024-25" in c] + \
+                                 [c for c in historical_xop_cols
+                                 if "2024-25" not in c]
         else:
             # Use standard historical weights
             all_weights = self.config.HISTORIC_SEASON_WEIGHTS
@@ -789,7 +850,8 @@ class HistoricalDataManager:
     
     def _calculate_xg_consistency_modifiers(
             self, hist: pd.DataFrame) -> pd.DataFrame:
-        """Calculate xG performance modifiers for each player."""
+        """Calculate xG performance modifiers for each player with 
+        ENHANCED penalties - NO DILUTION."""
         hist["xConsistency"] = 1.0  # Final Expected modifier
         hist["xOP_historical_baseline"] = np.nan
         
@@ -798,29 +860,29 @@ class HistoricalDataManager:
             player_data['current_position'] = self._get_player_position(row)
             
             # Check if player has historical xOP data
-            has_historical_data = self._player_has_historical_data(player_data)
+            has_historical_data = self._player_has_historical_data(
+                player_data)
             
             if has_historical_data:
-                # Calculate normal xG modifier
+                # Calculate xG modifier with STRONGER penalties
                 xg_modifier = self.calculate_xg_performance_modifier(
                     player_data)
                 hist.loc[idx, "xOP_historical_baseline"] = row.get(
                     "historical_xOP", 1.0)
+                
+                # CRITICAL FIX: Use the modifier directly, NO dilution
+                # The regression logic already accounts for uncertainty
+                final_modifier = xg_modifier
             else:
-                # New player - calculate modifier but mark baseline as NA
+                # New player - use more conservative approach
                 xg_modifier = self.calculate_xg_performance_modifier(
                     player_data)
                 hist.loc[idx, "xOP_historical_baseline"] = np.nan
+                
+                # For new players, blend slightly toward neutral
+                # due to lack of historical baseline
+                final_modifier = 1.0 + ((xg_modifier - 1.0) * 0.7)
             
-            # Apply data availability factor
-            if has_historical_data:
-                availability_factor = self.calculate_data_availability_factor(
-                    player_data)
-            else:
-                availability_factor = 0.7  # Give new players moderate impact
-            
-            # Blend with neutral (1.0) based on data availability
-            final_modifier = 1.0 + ((xg_modifier - 1.0) * availability_factor)
             hist.loc[idx, "xConsistency"] = round(final_modifier, 2)
         
         return hist
