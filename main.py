@@ -26,6 +26,8 @@ from src.utils.enhanced_main_display import (
     display_final_results_enhanced, 
     enhance_squad_comparison_display
 )
+from src.data.standings_tracker import StandingsTracker
+from src.analysis.performance_plotter import PerformancePlotter
 
 
 def extract_transfer_details(prev_squad_ids, starting_with_transfers, 
@@ -750,6 +752,33 @@ def get_prev_gw_summary(components, config):
     return None
 
 
+def generate_performance_visualisation(config):
+    """Generate performance plot at end of run."""
+    try:
+        if config.GAMEWEEK <= 2:
+            return  # Need at least 2 gameweeks of data
+        
+        if not config.GRANULAR_OUTPUT:
+            print("\n📊 Generating performance visualization...")
+        
+        tracker = StandingsTracker(config)
+        plotter = PerformancePlotter(config)
+        
+        # Get data
+        standings_df = tracker.get_complete_history_for_plotting(config.GAMEWEEK)
+        model_df = plotter.get_model_performance_data(config.GAMEWEEK)
+        
+        if not model_df.empty:
+            stats = plotter.generate_performance_report(
+                standings_df, model_df, config.GAMEWEEK
+            )
+            plotter.print_performance_summary(stats)
+    
+    except Exception as e:
+        if config.GRANULAR_OUTPUT:
+            print(f"Warning: Could not generate performance plot: {e}")
+
+
 def main():
     """Main function to run the FPL optimisation process."""
     config = Config()
@@ -923,6 +952,8 @@ def main():
             your_points, your_cost, penalty_points, token_manager,
             starting_display, config
         )
+
+    generate_performance_visualisation(config)
 
     if not starting_display.empty and not bench_display.empty:
         FileUtils.save_squad_data(config.GAMEWEEK, starting_display, bench_display)

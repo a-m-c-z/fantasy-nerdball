@@ -4,6 +4,7 @@ import os
 import pandas as pd
 from ..api.fpl_client import FPLClient
 from ..utils.file_utils import FileUtils
+from ..data.standings_tracker import StandingsTracker
 
 
 class ResultsAnalyser:
@@ -12,6 +13,7 @@ class ResultsAnalyser:
     def __init__(self, config):
         self.config = config
         self.fpl_client = FPLClient()
+        self.standings_tracker = StandingsTracker(config)
     
     def get_actual_points_for_gameweek(self, player_id: int, 
                                      gameweek: int) -> int:
@@ -219,6 +221,11 @@ class ResultsAnalyser:
             summary_data = self._calculate_summary_metrics(
                 starting_xi, gameweek
             )
+
+            # Add global standings cutoffs
+            standings_data = self._fetch_and_add_standings(gameweek)
+            if standings_data:
+                summary_data.extend(standings_data)
             
             # Create and save summary
             summary_df = pd.DataFrame(summary_data)
@@ -468,3 +475,48 @@ class ResultsAnalyser:
                 print(f"  {pos}: {item['actual']} pts "
                       f"(projected: {item['projected']:.1f}, "
                       f"diff: {item['difference']:+.1f})")
+                
+    def _fetch_and_add_standings(self, gameweek: int) -> list:
+        """
+        Fetch global standings cutoffs and format for summary.
+        
+        Args:
+            gameweek (int): Gameweek number
+            
+        Returns:
+            list: List of dictionaries with standings data
+        """
+        try:
+            # Fetch current cutoffs
+            cutoffs = self.standings_tracker.fetch_current_cutoffs()
+            
+            # Save for historical tracking
+            self.standings_tracker.save_cutoffs_for_gameweek(gameweek, cutoffs)
+            
+            # Format for summary
+            standings_data = []
+            
+            if cutoffs.get('top_10k') is not None:
+                standings_data.append({
+                    "metric": "Global Top 10k Cutoff",
+                    "projected": "-",
+                    "actual": cutoffs['top_10k'],
+                    "difference": "-",
+                    "notes": f"Points required to be in top 10,000 globally at GW{gameweek}",
+                })
+            
+            if cutoffs.get('top_100k') is not None:
+                standings_data.append({
+                    "metric": "Global Top 100k Cutoff",
+                    "projected": "-",
+                    "actual": cutoffs['top_100k'],
+                    "difference": "-",
+                    "notes": f"Points required to be in top 100,000 globally at GW{gameweek}",
+                })
+            
+            return standings_data
+            
+        except Exception as e:
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Warning: Could not fetch standings data: {e}")
+            return []
