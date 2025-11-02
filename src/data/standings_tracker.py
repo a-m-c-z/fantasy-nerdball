@@ -12,7 +12,6 @@ class StandingsTracker:
     # Target ranks to track
     TARGET_RANKS = {
         'top_10k': 10000,
-        'top_50k': 50000,
         'top_100k': 100000
     }
     
@@ -27,7 +26,7 @@ class StandingsTracker:
         if not os.path.exists(self.data_file):
             os.makedirs("data", exist_ok=True)
             df = pd.DataFrame(columns=[
-                'gameweek', 'top_10k', 'top_50k', 'top_100k', 
+                'gameweek', 'top_10k', 'top_100k', 
                 'timestamp', 'data_quality'
             ])
             df.to_csv(self.data_file, index=False)
@@ -117,7 +116,6 @@ class StandingsTracker:
             new_entry = {
                 'gameweek': gameweek,
                 'top_10k': cutoffs.get('top_10k'),
-                'top_50k': cutoffs.get('top_50k'),
                 'top_100k': cutoffs.get('top_100k'),
                 'timestamp': datetime.now().isoformat(),
                 'data_quality': 'actual'  # Mark as actual data (not interpolated)
@@ -147,7 +145,7 @@ class StandingsTracker:
             return df
         except Exception:
             return pd.DataFrame(columns=[
-                'gameweek', 'top_10k', 'top_50k', 'top_100k', 
+                'gameweek', 'top_10k', 'top_100k', 
                 'timestamp', 'data_quality'
             ])
     
@@ -177,7 +175,7 @@ class StandingsTracker:
         df.loc[df['data_quality'].notna(), 'data_quality'] = 'actual'
         
         # Interpolate missing values for each rank category
-        for rank_col in ['top_10k', 'top_50k', 'top_100k']:
+        for rank_col in ['top_10k', 'top_100k']:
             if rank_col in df.columns:
                 # Linear interpolation
                 df[rank_col] = df[rank_col].interpolate(
@@ -211,7 +209,7 @@ class StandingsTracker:
             return df
         
         # Convert to cumulative points
-        for col in ['top_10k', 'top_50k', 'top_100k']:
+        for col in ['top_10k', 'top_100k']:
             if col in df.columns:
                 # These are already cumulative from the API
                 pass
@@ -220,7 +218,6 @@ class StandingsTracker:
         gw0_row = pd.DataFrame([{
             'gameweek': 0,
             'top_10k': 0,
-            'top_50k': 0,
             'top_100k': 0,
             'data_quality': 'actual'
         }])

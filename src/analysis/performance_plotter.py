@@ -78,52 +78,25 @@ class PerformancePlotter:
         # Create figure and axis
         fig, ax = plt.subplots(figsize=(12, 7))
         
-        # Plot global ranking cutoffs
+        # Plot global ranking cutoffs - ONLY ACTUAL DATA
         if not standings_df.empty:
-            # Plot top 10k
+            # Plot top 10k - only actual data points
             if 'top_10k' in standings_df.columns:
                 actual_10k = standings_df[standings_df['data_quality'] == 'actual']
-                interpolated_10k = standings_df[standings_df['data_quality'] == 'interpolated']
                 
                 if not actual_10k.empty:
                     ax.plot(actual_10k['gameweek'], actual_10k['top_10k'], 
                            'o-', color='#2ecc71', linewidth=2, markersize=6,
-                           label='Top 10k (actual)', zorder=3)
-                
-                if not interpolated_10k.empty:
-                    ax.plot(interpolated_10k['gameweek'], interpolated_10k['top_10k'], 
-                           '--', color='#2ecc71', linewidth=1.5, alpha=0.6,
-                           label='Top 10k (interpolated)', zorder=2)
+                           label='Top 10k', zorder=3)
             
-            # Plot top 50k
-            if 'top_50k' in standings_df.columns:
-                actual_50k = standings_df[standings_df['data_quality'] == 'actual']
-                interpolated_50k = standings_df[standings_df['data_quality'] == 'interpolated']
-                
-                if not actual_50k.empty:
-                    ax.plot(actual_50k['gameweek'], actual_50k['top_50k'], 
-                           'o-', color='#3498db', linewidth=2, markersize=6,
-                           label='Top 50k (actual)', zorder=3)
-                
-                if not interpolated_50k.empty:
-                    ax.plot(interpolated_50k['gameweek'], interpolated_50k['top_50k'], 
-                           '--', color='#3498db', linewidth=1.5, alpha=0.6,
-                           label='Top 50k (interpolated)', zorder=2)
-            
-            # Plot top 100k
+            # Plot top 100k - only actual data points
             if 'top_100k' in standings_df.columns:
                 actual_100k = standings_df[standings_df['data_quality'] == 'actual']
-                interpolated_100k = standings_df[standings_df['data_quality'] == 'interpolated']
                 
                 if not actual_100k.empty:
                     ax.plot(actual_100k['gameweek'], actual_100k['top_100k'], 
                            'o-', color='#e74c3c', linewidth=2, markersize=6,
-                           label='Top 100k (actual)', zorder=3)
-                
-                if not interpolated_100k.empty:
-                    ax.plot(interpolated_100k['gameweek'], interpolated_100k['top_100k'], 
-                           '--', color='#e74c3c', linewidth=1.5, alpha=0.6,
-                           label='Top 100k (interpolated)', zorder=2)
+                           label='Top 100k', zorder=3)
         
         # Plot model performance
         if not model_df.empty:

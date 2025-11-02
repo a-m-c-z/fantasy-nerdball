@@ -86,7 +86,20 @@ class ResultsAnalyser:
         
         # Add actual points to dataframe
         prev_squad["actual_points"] = actual_points
+        
+        # Calculate total with captain bonus
         total_actual = sum(actual_points)
+        
+        # Add captain bonus (captain scores 2x, so add their points once more)
+        captain_players = prev_squad[
+            prev_squad["display_name"].str.contains(r"\(C\)", na=False)
+        ]
+        if len(captain_players) > 0:
+            captain_actual = captain_players.iloc[0]["actual_points"]
+            total_actual += captain_actual  # Add captain bonus
+            if self.config.GRANULAR_OUTPUT:
+                captain_name = captain_players.iloc[0]["display_name"].replace(" (C)", "")
+                print(f"Captain {captain_name}: {captain_actual} pts + {captain_actual} bonus = {captain_actual * 2} total")
         
         if self.config.GRANULAR_OUTPUT:
             print(f"Total squad points: {total_actual}")
@@ -248,12 +261,23 @@ class ResultsAnalyser:
         """Calculate comprehensive summary metrics for starting XI."""
         summary_data = []
         
-        # Starting XI totals
+        # Starting XI totals - base points
         total_projected = (
             starting_xi["projected_points"].sum()
             if "projected_points" in starting_xi.columns else 0
         )
         total_actual = starting_xi["actual_points"].sum()
+        
+        # Add captain bonus
+        captain_players = starting_xi[
+            starting_xi["display_name"].str.contains(r"\(C\)", na=False)
+        ]
+        captain_bonus = 0
+        if len(captain_players) > 0:
+            captain_actual = captain_players.iloc[0]["actual_points"]
+            captain_bonus = captain_actual  # Add captain bonus
+            total_actual += captain_bonus
+        
         total_difference = total_actual - total_projected
 
         summary_data.append({
