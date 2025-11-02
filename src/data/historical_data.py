@@ -676,7 +676,8 @@ class HistoricalDataManager:
         hist = self._calculate_weighted_historical_averages(hist)
         
         # Calculate xG performance modifiers with STRONGER penalties
-        hist = self._calculate_xg_consistency_modifiers(hist)
+        # CRITICAL: Pass current dataframe so we can access current_xOP
+        hist = self._calculate_xg_consistency_modifiers(hist, current)
         
         # Calculate current season reliability
         current_reliability = self._calculate_current_reliability(current)
@@ -849,15 +850,42 @@ class HistoricalDataManager:
         return hist
     
     def _calculate_xg_consistency_modifiers(
-            self, hist: pd.DataFrame) -> pd.DataFrame:
+            self, hist: pd.DataFrame,
+            current: pd.DataFrame) -> pd.DataFrame:
         """Calculate xG performance modifiers for each player with 
-        ENHANCED penalties - NO DILUTION."""
+        ENHANCED penalties - NO DILUTION.
+        
+        Args:
+            hist: Historical dataframe with historical_xOP
+            current: Current season dataframe with current_xOP
+        """
         hist["xConsistency"] = 1.0  # Final Expected modifier
         hist["xOP_historical_baseline"] = np.nan
+        
+        # Create lookup for current_xOP by name_key
+        current_xop_lookup = {}
+        current_xg_context_lookup = {}
+        if 'current_xOP' in current.columns and 'name_key' in current.columns:
+            for _, row in current.iterrows():
+                name_key = row['name_key']
+                current_xop_lookup[name_key] = row.get('current_xOP', 1.0)
+                current_xg_context_lookup[name_key] = row.get(
+                    'current_xg_context', 'insufficient_data')
         
         for idx, row in hist.iterrows():
             player_data = row.to_dict()
             player_data['current_position'] = self._get_player_position(row)
+            
+            # CRITICAL FIX: Get current_xOP from current dataframe
+            name_key = row.get('name_key', '')
+            if name_key in current_xop_lookup:
+                player_data['current_xOP'] = current_xop_lookup[name_key]
+                player_data['current_xg_context'] = (
+                    current_xg_context_lookup[name_key])
+            else:
+                # Fallback to neutral if player not found in current
+                player_data['current_xOP'] = 1.0
+                player_data['current_xg_context'] = 'insufficient_data'
             
             # Check if player has historical xOP data
             has_historical_data = self._player_has_historical_data(
