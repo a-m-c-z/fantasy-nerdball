@@ -423,10 +423,10 @@ class HistoricalDataManager:
         
         # Position-based sensitivity
         position_sensitivity = {
-            'FWD': 1.0,   # Forwards moderately sensitive
-            'MID': 0.9,   # Midfielders slightly less sensitive
-            'DEF': 1.2,   # Defenders very sensitive (clean sheets fragile)
-            'GK': 1.3     # Goalkeepers extremely sensitive
+            'FWD': 1.0,
+            'MID': 1.0,
+            'DEF': 0.7,
+            'GK': 0.7 
         }
         
         sensitivity = position_sensitivity.get(position, 0.9)
@@ -436,60 +436,49 @@ class HistoricalDataManager:
         
         if deviation > 0:  # Overperforming historical baseline
             if season_progression < 0.6:
-                # Early season overperformance - VERY STRONG regression
+                # Early season overperformance
                 if is_defensive_position:
-                    # Defensive overperformance is highly fragile
-                    # Example: Gabriel 0.96→1.91 (+0.95 deviation)
-                    # Should get: 1.0 - (0.95 * 1.2 * 0.75) = 0.145
                     regression_strength = min(
-                        abs_deviation * sensitivity * 0.75, 0.8
+                        abs_deviation * sensitivity * 0.50, 0.6
                     )
                 else:
-                    # Attacking overperformance less fragile but still
-                    # unlikely to sustain
-                    # Example: Semenyo 1.22→2.02 (+0.80 deviation)
-                    # Should get: 1.0 - (0.80 * 1.0 * 0.65) = 0.48
                     regression_strength = min(
-                        abs_deviation * sensitivity * 0.65, 0.7
+                        abs_deviation * sensitivity * 0.45, 0.55
                     )
                 
                 modifier = 1.0 - regression_strength
-                volatility = abs_deviation * (1.0 - season_progression) * 0.4
+                volatility = abs_deviation * (1.0 - season_progression) * 0.3
             else:
-                # Late season - still strong regression needed
                 if is_defensive_position:
                     regression_strength = min(
-                        abs_deviation * sensitivity * 0.55, 0.6
+                        abs_deviation * sensitivity * 0.35, 0.45
                     )
                 else:
                     # Might be genuine skill for attackers in late season
                     regression_strength = min(
-                        abs_deviation * sensitivity * 0.35, 0.45
+                        abs_deviation * sensitivity * 0.25, 0.35
                     )
                 
                 modifier = 1.0 - regression_strength
-                volatility = abs_deviation * 0.2
+                volatility = abs_deviation * 0.15
                 
-        else:  # Underperforming historical baseline
-            # Positive regression toward mean (expect improvement)
-            # Example: Mateta 1.18→0.70 (-0.48 deviation)
-            # Should get: 1.0 + (0.48 * 1.0 * 0.55) = 1.264
+        else:  
             if season_progression < 0.6:
                 # Early season - moderate positive regression
                 regression_strength = min(
-                    abs_deviation * sensitivity * 0.55, 0.4
+                    abs_deviation * sensitivity * 0.40, 0.35
                 )
                 modifier = 1.0 + regression_strength
-                volatility = abs_deviation * (1.0 - season_progression) * 0.25
+                volatility = abs_deviation * (1.0 - season_progression) * 0.2
             else:
                 # Late season - player might genuinely be declining
                 regression_strength = min(
-                    abs_deviation * sensitivity * 0.35, 0.3
+                    abs_deviation * sensitivity * 0.25, 0.25
                 )
                 modifier = 1.0 + regression_strength
-                volatility = abs_deviation * 0.15
+                volatility = abs_deviation * 0.12
         
-        return modifier, min(volatility, 0.5)  # Cap volatility
+        return modifier, min(volatility, 0.4)  # Cap volatility at 40%
 
     def _calculate_new_player_modifier(self, current_xop: float, 
                                      season_progression: float, 
@@ -532,24 +521,24 @@ class HistoricalDataManager:
 
     def _calculate_volatility_penalty(self, volatility: float) -> float:
         """
-        Apply volatility penalty to reduce modifier toward neutral.
+        Apply MODERATE volatility penalty to reduce modifier toward neutral.
         Higher volatility = less confident in current vs historical deviation.
         
         Args:
-            volatility (float): Volatility score (0.0 to 0.5)
+            volatility (float): Volatility score (0.0 to 0.4)
             
         Returns:
-            float: Penalty factor (0.0 to 0.6) to reduce modifier
+            float: Penalty factor (0.0 to 0.4) to reduce modifier
         """
-        # Strong linear scaling
-        base_penalty = volatility * 1.2
+        # Moderate linear scaling
+        base_penalty = volatility * 0.8
         
-        # Add exponential component for high volatility
+        # Add small exponential component for high volatility
         if volatility > 0.25:
-            exponential_bonus = (volatility - 0.25) ** 1.5 * 0.8
+            exponential_bonus = (volatility - 0.25) ** 1.3 * 0.5
             base_penalty += exponential_bonus
         
-        return min(base_penalty, 0.6)  # Cap at 60% penalty
+        return min(base_penalty, 0.4)  # Cap at 40% penalty
     
     def calculate_data_availability_factor(self,
                                           player_data: dict) -> float:
