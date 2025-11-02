@@ -225,10 +225,6 @@ class PerformancePlotter:
                     gap = stats['gap_to_10k']
                     print(f"  Top 10k:  {gap:+.0f} pts (cutoff: "
                           f"{stats['top_10k_cutoff']:.0f})")
-                if 'gap_to_50k' in stats:
-                    gap = stats['gap_to_50k']
-                    print(f"  Top 50k:  {gap:+.0f} pts (cutoff: "
-                          f"{stats['top_50k_cutoff']:.0f})")
                 if 'gap_to_100k' in stats:
                     gap = stats['gap_to_100k']
                     print(f"  Top 100k: {gap:+.0f} pts (cutoff: "
