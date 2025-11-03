@@ -679,9 +679,6 @@ class HistoricalDataManager:
                       "gameweeks")
             print("Calculated reliability based on starts over "
                   f"{gameweeks_completed} completed gameweek(s)")
-            print("Applied ENHANCED xG regression with stronger penalties "
-                  f"for defensive overperformance across "
-                  f"{len(self.config.PAST_SEASONS)} seasons")
 
         # Enhanced merge columns including historical baseline tracking
         merge_cols = [
