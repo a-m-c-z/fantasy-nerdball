@@ -8,6 +8,8 @@ import sys
 import logging
 import os
 from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import Config
 from src.data.player_history_tracker import PlayerHistoryTracker
 
