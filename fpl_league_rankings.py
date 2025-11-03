@@ -28,6 +28,34 @@ def get_current_gameweek():
         return None
 
 
+def get_total_players():
+    """
+    Get the total number of players in the global league.
+    
+    Returns:
+        int or None: Total number of players
+    """
+    try:
+        # Get bootstrap-static data which contains total_players
+        url = "https://fantasy.premierleague.com/api/bootstrap-static/"
+        
+        response = requests.get(url, params={}, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Get total players from the API
+        total = data.get('total_players', None)
+        
+        if total:
+            return total
+        
+        return None
+        
+    except Exception as e:
+        print(f"Error fetching total players: {e}")
+        return None
+
+
 def get_score_for_rank(target_rank):
     """
     Get the score for a player at approximately the target rank.
@@ -45,7 +73,10 @@ def get_score_for_rank(target_rank):
         page = ((target_rank - 1) // 50) + 1
         
         # Global league ID is 314
-        url = f"https://fantasy.premierleague.com/api/leagues-classic/314/standings/"
+        url = (
+            "https://fantasy.premierleague.com/api/"
+            "leagues-classic/314/standings/"
+        )
         params = {'page_standings': page}
         
         print(f"Fetching page {page} for rank ~{target_rank:,}...")
@@ -71,7 +102,7 @@ def get_score_for_rank(target_rank):
                 min_diff = rank_diff
                 closest_entry = entry
         
-        if closest_entry and min_diff < 1000:
+        if closest_entry:
             return {
                 'rank': closest_entry['rank'],
                 'total_points': closest_entry['total'],
@@ -79,8 +110,7 @@ def get_score_for_rank(target_rank):
                 'player_name': closest_entry['player_name']
             }
         else:
-            print(f"  ⚠️  Could not find rank within 50 of {target_rank:,} "
-                  f"(closest was {min_diff} away)")
+            print(f"  ⚠️  Could not find any entry on page {page}")
             return None
             
     except requests.exceptions.Timeout:
@@ -107,6 +137,13 @@ def main():
     else:
         print("\n⚠️  Could not determine current gameweek")
     
+    # Get total players
+    total_players = get_total_players()
+    if total_players:
+        print(f"Total Players: {total_players:,}")
+    else:
+        print("⚠️  Could not determine total players")
+    
     print("\nFetching rankings...\n")
     
     # Get top 10k score
@@ -114,6 +151,23 @@ def main():
     
     # Get top 100k score
     top_100k = get_score_for_rank(100000)
+    
+    # Get percentile scores if we have total players
+    percentiles = {}
+    if total_players:
+        print("\nFetching percentile rankings...\n")
+        
+        p01_rank = int(total_players * 0.01)
+        p10_rank = int(total_players * 0.10)
+        p25_rank = int(total_players * 0.25)
+        p50_rank = int(total_players * 0.50)
+        p75_rank = int(total_players * 0.75)
+        
+        percentiles['p01'] = get_score_for_rank(p01_rank)
+        percentiles['p10'] = get_score_for_rank(p10_rank)
+        percentiles['p25'] = get_score_for_rank(p25_rank)
+        percentiles['p50'] = get_score_for_rank(p50_rank)
+        percentiles['p75'] = get_score_for_rank(p75_rank)
     
     # Display results
     print("\n" + "=" * 60)
@@ -137,6 +191,27 @@ def main():
         print(f"   Manager: {top_100k['player_name']}")
     else:
         print(f"\n❌ Top 100,000: Could not fetch data")
+    
+    # Display percentile results
+    if percentiles:
+        percentile_labels = {
+            'p01': '1st Percentile',
+            'p10': '10th Percentile',
+            'p25': '25th Percentile',
+            'p50': '50th Percentile (Median)',
+            'p75': '75th Percentile'
+        }
+        
+        for key, label in percentile_labels.items():
+            if percentiles.get(key):
+                data = percentiles[key]
+                print(f"\n✅ {label}:")
+                print(f"   Rank: {data['rank']:,}")
+                print(f"   Points: {data['total_points']}")
+                print(f"   Team: {data['team_name']}")
+                print(f"   Manager: {data['player_name']}")
+            else:
+                print(f"\n❌ {label}: Could not fetch data")
     
     print("\n" + "=" * 60)
     
