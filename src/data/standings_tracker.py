@@ -65,8 +65,9 @@ class StandingsTracker:
                 key=lambda x: abs(x.get('rank', 0) - target_rank)
             )
             
-            # Only return if we're within 25 ranks of target
-            if abs(closest_entry.get('rank', 0) - target_rank) < 25:
+            # Only return if we're within 10% of target rank
+            rank_threshold = target_rank * 0.1
+            if abs(closest_entry.get('rank', 0) - target_rank) <= rank_threshold:
                 return closest_entry.get('total', None)
             
             return None
