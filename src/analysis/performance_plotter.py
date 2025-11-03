@@ -194,6 +194,19 @@ class PerformancePlotter:
         # Save plot
         output_path = os.path.join(
             self.output_dir, f'model_plot_gw{current_gameweek}.jpeg')
+        
+        # Check if file exists and prompt user (always prompt)
+        if os.path.exists(output_path):
+            print(f"\n⚠️  Plot already exists at {output_path}")
+            response = input(
+                "Overwrite existing plot? (y/n): "
+            ).lower().strip()
+            
+            if response not in ['y', 'yes']:
+                print("Plot generation cancelled.")
+                plt.close()
+                return None
+        
         plt.savefig(
             output_path, 
             dpi=150, 
@@ -226,6 +239,10 @@ class PerformancePlotter:
         plot_path = self.create_performance_plot(
             standings_df, model_df, current_gameweek
         )
+        
+        # If plot generation was cancelled, return empty stats
+        if plot_path is None:
+            return {'plot_cancelled': True}
         
         # Calculate performance statistics
         stats = {}
@@ -287,6 +304,10 @@ class PerformancePlotter:
             stats (dict): Performance statistics
         """
         if not self.config.GRANULAR_OUTPUT:
+            return
+        
+        # Check if plot was cancelled
+        if stats.get('plot_cancelled'):
             return
         
         print(f"\n=== MODEL PERFORMANCE SUMMARY ===")
