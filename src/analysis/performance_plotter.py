@@ -1,4 +1,4 @@
-"""Module for creating model performance visualizations."""
+"""Module for creating model performance visualisations."""
 
 import os
 import pandas as pd
@@ -8,7 +8,7 @@ from datetime import datetime
 
 
 class PerformancePlotter:
-    """Handles creation of model performance visualizations."""
+    """Handles creation of model performance visualisations."""
     
     def __init__(self, config):
         self.config = config
@@ -61,18 +61,23 @@ class PerformancePlotter:
                         
                 except Exception as e:
                     if self.config.GRANULAR_OUTPUT:
-                        print(f"Warning: Could not read GW{gw} summary: {e}")
+                        print(f"Warning: Could not read GW{gw} "
+                              f"summary: {e}")
         
         return pd.DataFrame(model_data)
     
-    def create_performance_plot(self, standings_df, model_df, current_gameweek):
+    def create_performance_plot(self, standings_df, model_df, 
+                               current_gameweek):
         """
-        Create a line plot comparing model performance to global rankings.
+        Create a line plot comparing model performance to global 
+        rankings.
         All lines start at 0 points at gameweek 0.
         
         Args:
-            standings_df (pd.DataFrame): Global standings data by gameweek (cumulative)
-            model_df (pd.DataFrame): Model performance data by gameweek (cumulative)
+            standings_df (pd.DataFrame): Global standings data by 
+                                        gameweek (cumulative)
+            model_df (pd.DataFrame): Model performance data by gameweek 
+                                    (cumulative)
             current_gameweek (int): Current gameweek number
         """
         # Create figure and axis
@@ -82,33 +87,91 @@ class PerformancePlotter:
         if not standings_df.empty:
             # Plot top 10k - only actual data points
             if 'top_10k' in standings_df.columns:
-                actual_10k = standings_df[standings_df['data_quality'] == 'actual']
+                actual_10k = standings_df[
+                    standings_df['data_quality'] == 'actual'
+                ]
                 
                 if not actual_10k.empty:
-                    ax.plot(actual_10k['gameweek'], actual_10k['top_10k'], 
-                           'o-', color='#2ecc71', linewidth=2, markersize=6,
-                           label='Top 10k', zorder=3)
+                    ax.plot(
+                        actual_10k['gameweek'], 
+                        actual_10k['top_10k'], 
+                        'o-', 
+                        color='#2ecc71', 
+                        linewidth=2, 
+                        markersize=6,
+                        label='Top 10k', 
+                        zorder=3
+                    )
             
             # Plot top 100k - only actual data points
             if 'top_100k' in standings_df.columns:
-                actual_100k = standings_df[standings_df['data_quality'] == 'actual']
+                actual_100k = standings_df[
+                    standings_df['data_quality'] == 'actual'
+                ]
                 
                 if not actual_100k.empty:
-                    ax.plot(actual_100k['gameweek'], actual_100k['top_100k'], 
-                           'o-', color='#e74c3c', linewidth=2, markersize=6,
-                           label='Top 100k', zorder=3)
+                    ax.plot(
+                        actual_100k['gameweek'], 
+                        actual_100k['top_100k'], 
+                        'o-', 
+                        color='#e74c3c', 
+                        linewidth=2, 
+                        markersize=6,
+                        label='Top 100k', 
+                        zorder=3
+                    )
+            
+            # Plot percentiles - grey dotted lines
+            percentiles = [
+                ('p25', '25th %ile'),
+                ('p50', '50th %ile'),
+                ('p75', '75th %ile')
+            ]
+            
+            for col, label in percentiles:
+                if col in standings_df.columns:
+                    actual_percentile = standings_df[
+                        standings_df['data_quality'] == 'actual'
+                    ]
+                    if not actual_percentile.empty:
+                        ax.plot(
+                            actual_percentile['gameweek'], 
+                            actual_percentile[col], 
+                            'o:', 
+                            color='#7f8c8d',  # Grey colour
+                            linewidth=1.5, 
+                            markersize=4,
+                            label=label, 
+                            zorder=2, 
+                            alpha=0.6
+                        )
         
         # Plot model performance
         if not model_df.empty:
-            ax.plot(model_df['gameweek'], model_df['model_points'], 
-                   'o-', color='#9b59b6', linewidth=2.5, markersize=7,
-                   label='Your Model', zorder=4)
+            ax.plot(
+                model_df['gameweek'], 
+                model_df['model_points'], 
+                'o-', 
+                color='#9b59b6', 
+                linewidth=2.5, 
+                markersize=7,
+                label='Your Model', 
+                zorder=4
+            )
         
         # Styling
         ax.set_xlabel('Gameweek', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Total Points (Cumulative)', fontsize=12, fontweight='bold')
-        ax.set_title('Model Performance vs Global Rankings', 
-                    fontsize=14, fontweight='bold', pad=20)
+        ax.set_ylabel(
+            'Total Points (Cumulative)', 
+            fontsize=12, 
+            fontweight='bold'
+        )
+        ax.set_title(
+            'Model Performance vs Global Rankings', 
+            fontsize=14, 
+            fontweight='bold', 
+            pad=20
+        )
         
         # Grid
         ax.grid(True, alpha=0.3, linestyle='--')
@@ -127,9 +190,15 @@ class PerformancePlotter:
         plt.tight_layout()
         
         # Save plot
-        output_path = os.path.join(self.output_dir, 'model_plot.jpeg')
-        plt.savefig(output_path, dpi=150, bbox_inches='tight', 
-                   facecolor='white', edgecolor='none')
+        output_path = os.path.join(
+            self.output_dir, f'model_plot_gw{current_gameweek}.jpeg')
+        plt.savefig(
+            output_path, 
+            dpi=150, 
+            bbox_inches='tight', 
+            facecolor='white', 
+            edgecolor='none'
+        )
         plt.close()
         
         if self.config.GRANULAR_OUTPUT:
@@ -140,7 +209,8 @@ class PerformancePlotter:
     def generate_performance_report(self, standings_df, model_df, 
                                    current_gameweek):
         """
-        Generate a complete performance report with plot and summary stats.
+        Generate a complete performance report with plot and summary 
+        stats.
         
         Args:
             standings_df (pd.DataFrame): Global standings data
@@ -175,22 +245,28 @@ class PerformancePlotter:
                 
                 if not latest_standings.empty:
                     top_10k = latest_standings['top_10k'].iloc[0]
-                    top_50k = latest_standings['top_50k'].iloc[0]
+                    top_50k = latest_standings.get(
+                        'top_50k', 
+                        pd.Series([None])
+                    ).iloc[0]
                     top_100k = latest_standings['top_100k'].iloc[0]
                     
                     stats['top_10k_cutoff'] = top_10k
-                    stats['top_50k_cutoff'] = top_50k
+                    if top_50k is not None:
+                        stats['top_50k_cutoff'] = top_50k
                     stats['top_100k_cutoff'] = top_100k
                     
                     # Calculate gaps
                     stats['gap_to_10k'] = latest_points - top_10k
-                    stats['gap_to_50k'] = latest_points - top_50k
+                    if top_50k is not None:
+                        stats['gap_to_50k'] = latest_points - top_50k
                     stats['gap_to_100k'] = latest_points - top_100k
                     
                     # Determine ranking tier
                     if latest_points >= top_10k:
                         stats['ranking_tier'] = 'Top 10k pace'
-                    elif latest_points >= top_50k:
+                    elif (top_50k is not None and 
+                          latest_points >= top_50k):
                         stats['ranking_tier'] = 'Top 50k pace'
                     elif latest_points >= top_100k:
                         stats['ranking_tier'] = 'Top 100k pace'
