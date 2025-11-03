@@ -5,8 +5,11 @@ Displays detailed scoring breakdown and predictions without running full
 optimisation.
 """
 
+import os
 import sys
 import pandas as pd
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import Config
 from src.api.fpl_client import FPLClient
 from src.data.player_processor import PlayerProcessor
