@@ -157,10 +157,14 @@ def main():
     if total_players:
         print("\nFetching percentile rankings...\n")
         
+        p01_rank = int(total_players * 0.01)
+        p10_rank = int(total_players * 0.10)
         p25_rank = int(total_players * 0.25)
         p50_rank = int(total_players * 0.50)
         p75_rank = int(total_players * 0.75)
         
+        percentiles['p01'] = get_score_for_rank(p01_rank)
+        percentiles['p10'] = get_score_for_rank(p10_rank)
         percentiles['p25'] = get_score_for_rank(p25_rank)
         percentiles['p50'] = get_score_for_rank(p50_rank)
         percentiles['p75'] = get_score_for_rank(p75_rank)
@@ -191,6 +195,8 @@ def main():
     # Display percentile results
     if percentiles:
         percentile_labels = {
+            'p01': '1st Percentile',
+            'p10': '10th Percentile',
             'p25': '25th Percentile',
             'p50': '50th Percentile (Median)',
             'p75': '75th Percentile'

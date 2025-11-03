@@ -123,9 +123,11 @@ class PerformancePlotter:
             
             # Plot percentiles - grey dotted lines
             percentiles = [
-                ('p25', '25th %ile'),
-                ('p50', '50th %ile'),
-                ('p75', '75th %ile')
+                ('p01', 'Top 1%'),
+                ('p10', 'Top 10%'),
+                ('p25', 'Top 25%'),
+                ('p50', 'Top 50%'),
+                ('p75', 'Top 75%')
             ]
             
             for col, label in percentiles:

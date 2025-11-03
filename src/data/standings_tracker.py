@@ -28,7 +28,8 @@ class StandingsTracker:
         if not os.path.exists(self.data_file):
             os.makedirs("data", exist_ok=True)
             df = pd.DataFrame(columns=[
-                'gameweek', 'top_10k', 'top_100k', 'p25', 'p50', 'p75',
+                'gameweek', 'top_10k', 'top_100k', 
+                'p01', 'p10', 'p25', 'p50', 'p75',
                 'timestamp', 'data_quality'
             ])
             df.to_csv(self.data_file, index=False)
@@ -63,7 +64,8 @@ class StandingsTracker:
     
     def calculate_percentile_ranks(self):
         """
-        Calculate rank values for 25th, 50th, and 75th percentiles.
+        Calculate rank values for 1st, 10th, 25th, 50th, and 75th 
+        percentiles.
         Updates self.percentile_ranks.
         """
         if self.total_players is None:
@@ -71,6 +73,8 @@ class StandingsTracker:
         
         if self.total_players:
             self.percentile_ranks = {
+                'p01': int(self.total_players * 0.01),
+                'p10': int(self.total_players * 0.10),
                 'p25': int(self.total_players * 0.25),
                 'p50': int(self.total_players * 0.50),
                 'p75': int(self.total_players * 0.75)
@@ -79,6 +83,8 @@ class StandingsTracker:
             if self.config.GRANULAR_OUTPUT:
                 print(f"\nTotal players: {self.total_players:,}")
                 print(f"Percentile ranks: "
+                      f"1st={self.percentile_ranks['p01']:,}, "
+                      f"10th={self.percentile_ranks['p10']:,}, "
                       f"25th={self.percentile_ranks['p25']:,}, "
                       f"50th={self.percentile_ranks['p50']:,}, "
                       f"75th={self.percentile_ranks['p75']:,}")
@@ -188,6 +194,8 @@ class StandingsTracker:
                 'gameweek': gameweek,
                 'top_10k': cutoffs.get('top_10k'),
                 'top_100k': cutoffs.get('top_100k'),
+                'p01': cutoffs.get('p01'),
+                'p10': cutoffs.get('p10'),
                 'p25': cutoffs.get('p25'),
                 'p50': cutoffs.get('p50'),
                 'p75': cutoffs.get('p75'),
@@ -223,7 +231,8 @@ class StandingsTracker:
             return df
         except Exception:
             return pd.DataFrame(columns=[
-                'gameweek', 'top_10k', 'top_100k', 'p25', 'p50', 'p75',
+                'gameweek', 'top_10k', 'top_100k', 
+                'p01', 'p10', 'p25', 'p50', 'p75',
                 'timestamp', 'data_quality'
             ])
     
@@ -253,7 +262,10 @@ class StandingsTracker:
         df.loc[df['data_quality'].notna(), 'data_quality'] = 'actual'
         
         # Interpolate missing values for each rank category
-        rank_cols = ['top_10k', 'top_100k', 'p25', 'p50', 'p75']
+        rank_cols = [
+            'top_10k', 'top_100k', 
+            'p01', 'p10', 'p25', 'p50', 'p75'
+        ]
         for rank_col in rank_cols:
             if rank_col in df.columns:
                 # Linear interpolation
@@ -298,6 +310,8 @@ class StandingsTracker:
             'gameweek': 0,
             'top_10k': 0,
             'top_100k': 0,
+            'p01': 0,
+            'p10': 0,
             'p25': 0,
             'p50': 0,
             'p75': 0,
