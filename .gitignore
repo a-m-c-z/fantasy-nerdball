@@ -208,6 +208,7 @@ __marimo__/
 
 /data/
 /ml/training_data/
+/ml_output/
 /model_performance/
 /squads/
 /config.py

@@ -13,7 +13,7 @@ import sys
 import requests
 from io import StringIO
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.utils.text_utils import normalize_name
+from src.utils.text_utils import normalise_name
 from src.data.historical_data import HistoricalDataManager
 from config import Config
 
@@ -49,7 +49,7 @@ class MLTrainingDataPreparer:
         
         # Additional columns we calculate
         self.calculated_columns = [
-            'form', 'historical_ppg', 'fixture_difficulty', 'opponent_team',
+            'gameweek', 'form', 'historical_ppg', 'fixture_difficulty', 'opponent_team',
             'position'
         ]
         
@@ -216,8 +216,8 @@ class MLTrainingDataPreparer:
                     if not web_name:
                         continue
                     
-                    # Normalize web_name for consistent matching
-                    name_key = normalize_name(web_name)
+                    # normalise web_name for consistent matching
+                    name_key = normalise_name(web_name)
                     
                     # Calculate PPG
                     total_points = row.get('total_points', 0)
@@ -338,6 +338,9 @@ class MLTrainingDataPreparer:
             gw_df['fixture_difficulty'] = gw_df['opponent_team'].map(
                 self.team_difficulty
             ).fillna(3)  # Default to 3 if not found
+
+            # Add gameweek
+            gw_df['gameweek'] = range(1, len(gw_df) + 1)
             
             # Add historical PPG using web_name for matching
             # Note: At this point we know hist_ppg > 0 from earlier check
@@ -353,7 +356,7 @@ class MLTrainingDataPreparer:
             # Keep only required columns
             columns_to_keep = (
                 self.keep_columns + 
-                ['form', 'historical_ppg', 'fixture_difficulty', 'position']
+                ['form', 'historical_ppg', 'fixture_difficulty', 'position', 'gameweek']
             )
             
             # Only keep columns that exist
@@ -393,8 +396,8 @@ class MLTrainingDataPreparer:
         Returns:
             float: Historical PPG or 0.0 if not found
         """
-        # Normalize the web_name
-        name_key = normalize_name(player_web_name)
+        # normalise the web_name
+        name_key = normalise_name(player_web_name)
         
         # Direct lookup (should work for most players now)
         return historical_data.get(name_key, 0.0)
@@ -412,7 +415,7 @@ class MLTrainingDataPreparer:
         # Replace underscores with spaces first
         name = name.replace('_', ' ')
         # Normalise the name
-        name = normalize_name(name)
+        name = normalise_name(name)
         # Replace spaces with underscores for filename
         name = name.replace(' ', '_')
         return name
@@ -435,8 +438,8 @@ class MLTrainingDataPreparer:
                 player_web_name, historical_data
             )
             
-            # Get normalized name
-            name_norm = normalize_name(player_web_name)
+            # Get normalised name
+            name_norm = normalise_name(player_web_name)
             
             report_data.append({
                 'web_name': player_web_name,
@@ -536,10 +539,10 @@ def main():
         )
         print(f"Overall inclusion rate: {overall_match_rate:.1f}%")
     
-    print(f"\n💡 Only players with historical PPG data are included")
+    print(f"\n Only players with historical PPG data are included")
     print(f"   This ensures the model can learn from historical patterns")
     
-    print("\n✅ Multi-season data preparation complete!")
+    print("\n Multi-season data preparation complete!")
     print(f"Training data saved to: ml/training_data/{{season}}/")
 
 
