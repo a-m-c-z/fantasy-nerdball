@@ -8,8 +8,8 @@ fixture difficulty.
 import os
 import pandas as pd
 import numpy as np
-import sys
 from pathlib import Path
+import sys
 import requests
 from io import StringIO
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -49,8 +49,17 @@ class MLTrainingDataPreparer:
         
         # Additional columns we calculate
         self.calculated_columns = [
-            'form', 'historical_ppg', 'fixture_difficulty', 'opponent_team'
+            'form', 'historical_ppg', 'fixture_difficulty', 'opponent_team',
+            'position'
         ]
+        
+        # Position mapping from element_type to position name
+        self.position_map = {
+            1: 'GK',
+            2: 'DEF',
+            3: 'MID',
+            4: 'FWD'
+        }
     
     def prepare_all_data(self):
         """
@@ -82,37 +91,45 @@ class MLTrainingDataPreparer:
         
         print(f"Found {len(players)} players with 1000+ minutes")
         
-        # Process each player
+        # Filter to only players WITH historical data
+        players_original_count = len(players)
+        players['historical_ppg'] = players['player_name'].apply(
+            lambda name: self._get_historical_ppg_for_player(
+                name, historical_data
+            )
+        )
+        
+        # Keep only players with historical_ppg > 0
+        players_with_history = players[players['historical_ppg'] > 0].copy()
+        players_without_history = players_original_count - len(
+            players_with_history
+        )
+        
+        print(f"Players with historical data: {len(players_with_history)}")
+        print(f"Players without historical data (excluded): "
+              f"{players_without_history}")
+        
+        # Process each player (only those with historical data)
         processed_count = 0
         skipped_count = 0
         error_count = 0
-        matched_historical = 0
-        missing_historical = 0
         
-        for idx, player in players.iterrows():
+        for idx, player in players_with_history.iterrows():
             try:
-                player_web_name = player['player_name']  # web_name
-                player_dir_name = player['dir_name']     # directory name
+                player_web_name = player['player_name']
+                player_dir_name = player['dir_name']
                 player_id = player['id']
+                player_position = player['position']
                 
                 # Progress indicator (less frequent for multi-season run)
                 if (idx + 1) % 100 == 0:
-                    print(f"  Processing player {idx + 1}/{len(players)}...")
-                
-                # Check if historical data exists for this player
-                hist_ppg = self._get_historical_ppg_for_player(
-                    player_web_name, historical_data
-                )
-                
-                if hist_ppg > 0:
-                    matched_historical += 1
-                else:
-                    missing_historical += 1
+                    print(f"  Processing player {processed_count + 1}/"
+                          f"{len(players_with_history)}...")
                 
                 # Process player data
                 success = self._process_player(
                     player_web_name, player_dir_name, player_id, 
-                    teams_df, historical_data
+                    player_position, teams_df, historical_data
                 )
                 
                 if success:
@@ -125,20 +142,19 @@ class MLTrainingDataPreparer:
                 if error_count <= 3:  # Reduced error output
                     print(f"  Error processing {player_web_name}: {e}")
         
-        total_players = matched_historical + missing_historical
-        match_rate = (matched_historical / total_players * 100 
-                     if total_players > 0 else 0)
+        match_rate = (len(players_with_history) / players_original_count 
+                     * 100 if players_original_count > 0 else 0)
         
         print(f"  Successfully processed: {processed_count} players")
-        print(f"  Historical match rate: "
-              f"{matched_historical}/{total_players} ({match_rate:.1f}%)")
+        print(f"  Skipped (file errors): {skipped_count} players")
+        print(f"  Training data includes only players with historical data")
         
         # Save a matching report
         self._save_matching_report(players, historical_data)
         
         stats = {
-            'matched': matched_historical,
-            'unmatched': missing_historical,
+            'matched': len(players_with_history),
+            'unmatched': players_without_history,
             'match_rate': match_rate,
             'processed': processed_count,
             'skipped': skipped_count,
@@ -250,7 +266,8 @@ class MLTrainingDataPreparer:
         return weighted_historical
     
     def _get_players_list(self):
-        """Get list of all players for target season with web_name."""
+        """Get list of all players for target season with web_name and 
+        position."""
         try:
             url = f"{self.base_url}/{self.target_season}/players_raw.csv"
             response = requests.get(url)
@@ -272,14 +289,19 @@ class MLTrainingDataPreparer:
             )
             players_df['id'] = players_df['id']
             
-            return players_df[['player_name', 'dir_name', 'id']]
+            # Map element_type to position name
+            players_df['position'] = players_df['element_type'].map(
+                self.position_map
+            )
+            
+            return players_df[['player_name', 'dir_name', 'id', 'position']]
             
         except Exception as e:
             print(f"Error fetching players list: {e}")
             return None
     
     def _process_player(self, player_web_name, player_dir_name, player_id, 
-                       teams_df, historical_data):
+                       player_position, teams_df, historical_data):
         """
         Process individual player's gameweek data.
         
@@ -287,6 +309,7 @@ class MLTrainingDataPreparer:
             player_web_name (str): Player's web_name (for matching)
             player_dir_name (str): Player's directory name (for fetching)
             player_id (int): Player's ID
+            player_position (str): Player's position (GK/DEF/MID/FWD)
             teams_df (pd.DataFrame): Teams data for fixture difficulty
             historical_data (dict): Historical PPG by normalised web_name
             
@@ -317,16 +340,20 @@ class MLTrainingDataPreparer:
             ).fillna(3)  # Default to 3 if not found
             
             # Add historical PPG using web_name for matching
+            # Note: At this point we know hist_ppg > 0 from earlier check
             historical_ppg = self._get_historical_ppg_for_player(
                 player_web_name, historical_data
             )
             
             gw_df['historical_ppg'] = historical_ppg
             
+            # Add position (constant for all rows of this player)
+            gw_df['position'] = player_position
+            
             # Keep only required columns
             columns_to_keep = (
                 self.keep_columns + 
-                ['form', 'historical_ppg', 'fixture_difficulty']
+                ['form', 'historical_ppg', 'fixture_difficulty', 'position']
             )
             
             # Only keep columns that exist
@@ -495,10 +522,11 @@ def main():
     print(f"Seasons successfully processed: "
           f"{overall_stats['seasons_processed']}")
     print(f"Seasons failed: {overall_stats['seasons_failed']}")
-    print(f"Total player-seasons processed: "
+    print(f"Total players evaluated: "
           f"{overall_stats['total_players']}")
-    print(f"Total with historical data: {overall_stats['total_matched']}")
-    print(f"Total without historical data: "
+    print(f"Players included in training data: "
+          f"{overall_stats['total_matched']}")
+    print(f"Players excluded (no historical data): "
           f"{overall_stats['total_unmatched']}")
     
     if overall_stats['total_players'] > 0:
@@ -506,7 +534,10 @@ def main():
             overall_stats['total_matched'] / 
             overall_stats['total_players'] * 100
         )
-        print(f"Overall match rate: {overall_match_rate:.1f}%")
+        print(f"Overall inclusion rate: {overall_match_rate:.1f}%")
+    
+    print(f"\n💡 Only players with historical PPG data are included")
+    print(f"   This ensures the model can learn from historical patterns")
     
     print("\n✅ Multi-season data preparation complete!")
     print(f"Training data saved to: ml/training_data/{{season}}/")
