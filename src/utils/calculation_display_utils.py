@@ -233,15 +233,23 @@ class CalculationDisplayUtils:
             gameweeks_completed
         )
         
+        # Get position-specific weights
+        position = player.get('position', 'MID')
+        position_weights = self.config.POSITION_SCORING_WEIGHTS.get(
+            position, self.config.POSITION_SCORING_WEIGHTS.get("MID", {
+                "form": 0.5, "historic": 0.3, "difficulty": 0.2
+            })
+        )
+        
         # Get weights
         if is_new_player:
-            form_weight = 1.0 - self.config.DIFFICULTY_WEIGHT
+            form_weight = 1.0 - position_weights["difficulty"]
             hist_weight = 0.0
-            fix_weight = self.config.DIFFICULTY_WEIGHT
+            fix_weight = position_weights["difficulty"]
         else:
-            form_weight = self.config.FORM_WEIGHT
-            hist_weight = self.config.HISTORIC_WEIGHT
-            fix_weight = self.config.DIFFICULTY_WEIGHT
+            form_weight = position_weights["form"]
+            hist_weight = position_weights["historic"]
+            fix_weight = position_weights["difficulty"]
         
         # Get final scores
         base_quality = player.get('base_quality', 0)

@@ -1,5 +1,4 @@
 """
-COPY THIS CONFIG AND SAVE IN ROOT DIRECTORY AS config.py
 Configuration settings for Fantasy Nerdball FPL optimisation tool.
 Edit this file to customise your optimisation preferences.
 """
@@ -49,13 +48,17 @@ class Config:
     FIRST_N_GAMEWEEKS = 5
 
     # === FIXTURE DIFFICULTY DECAY SETTINGS ===
-    # Controls importance of upcoming fixture against distant ones
+    # Controls how much future fixtures are discounted relative to immediate ones
     # 0.6 means each subsequent gameweek is weighted 60% of the previous
     # Lower values = more emphasis on immediate fixtures
     # Higher values = more balanced weighting across all fixtures
     FIXTURE_DECAY_FACTOR = 0.8
 
     # === SCORING WEIGHTS BY POSITION ===
+    # Use weights optimised by ML (set to True to load from CSV files)
+    USE_ML_WEIGHTS = True
+    
+    # Manual weights - used if ML weights disabled or loading fails
     # These should total 1.0 for each position
     POSITION_SCORING_WEIGHTS = {
         "GK": {
@@ -135,3 +138,34 @@ class Config:
 
     # Players that should not be considered (use lowercase names)
     BLACKLIST_PLAYERS = []
+
+    def __init__(self):
+        """Initialise config and load ML weights if enabled."""
+        import copy
+        
+        # Make a deep copy of POSITION_SCORING_WEIGHTS to avoid modifying
+        # the class variable
+        self.POSITION_SCORING_WEIGHTS = copy.deepcopy(
+            self.__class__.POSITION_SCORING_WEIGHTS
+        )
+        
+        # Load ML weights if enabled
+        if self.USE_ML_WEIGHTS:
+            try:
+                from src.utils.ml_weight_loader import MLWeightLoader
+                loader = MLWeightLoader(self)
+                self.POSITION_SCORING_WEIGHTS = loader.load_all_weights(
+                    self.POSITION_SCORING_WEIGHTS
+                )
+            except ImportError:
+                if self.GRANULAR_OUTPUT:
+                    print(
+                        "⚠ Could not import ml_weight_loader module. "
+                        "Using manual weights."
+                    )
+            except Exception as e:
+                if self.GRANULAR_OUTPUT:
+                    print(
+                        f"⚠ Error loading ML weights: {e}. "
+                        f"Using manual weights."
+                    )

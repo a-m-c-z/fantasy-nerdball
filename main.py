@@ -128,7 +128,8 @@ def prompt_player_history_update(config):
             print("Updating player history data...")
             try:
                 result = subprocess.run([
-                    sys.executable, 'update_player_history.py', 'update'
+                    sys.executable, 'utility_scripts/update_player_history.py',
+                    'update'
                 ], capture_output=True, text=True)
                 
                 if result.returncode == 0:
@@ -153,7 +154,8 @@ def prompt_player_history_update(config):
             print("Showing player history statistics...")
             try:
                 result = subprocess.run([
-                    sys.executable, 'update_player_history.py', 'stats'
+                    sys.executable, 'utility_scripts/update_player_history.py',
+                    'stats'
                 ], capture_output=True, text=True)
                 
                 if result.returncode == 0 and result.stdout:
@@ -796,7 +798,8 @@ def main():
             print("\n📈 Reviewing previous gameweek...")
             try:
                 result = subprocess.run([
-                    sys.executable, 'update_player_history.py', 'update'
+                    sys.executable, 'utility_scripts/update_player_history.py',
+                    'update'
                 ], capture_output=True, text=True)
                 
                 # Only show output if there's an error
